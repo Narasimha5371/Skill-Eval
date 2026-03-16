@@ -1,0 +1,88 @@
+// prisma/schema.prisma
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(uuid())
+  clerkId   String   @unique // Linked to Clerk User ID
+  role      Role     @default(CANDIDATE)
+  name      String?
+  email     String?  @unique
+  resumes   Resume[]
+  tests     Test[]
+  createdAt DateTime @default(now())
+}
+
+enum Role {
+  CANDIDATE
+  MANAGER
+}
+
+model Resume {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  fileUrl   String   // URL to S3/Blob storage
+  rawText   String?  @db.Text // Extracted text for LLM context
+  skills    Skill[]
+  createdAt DateTime @default(now())
+}
+
+model Skill {
+  id        String   @id @default(uuid())
+  resumeId  String
+  resume    Resume   @relation(fields: [resumeId], references: [id])
+  name      String   // e.g., "React", "Python", "Communication"
+  category  Category @default(TECHNICAL)
+  level     String?  // Optional: Beginner, Intermediate, Expert (Inferred)
+}
+
+enum Category {
+  TECHNICAL
+  SOFT_SKILL
+}
+
+model Test {
+  id          String     @id @default(uuid())
+  userId      String
+  user        User       @relation(fields: [userId], references: [id])
+  status      TestStatus @default(PENDING)
+  questions   Question[]
+  totalScore  Float?     // e.g., 85.5
+  creativityAnalysis String? @db.Text // AI analysis of problem-solving style
+  createdAt   DateTime   @default(now())
+  completedAt DateTime?
+}
+
+enum TestStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+}
+
+model Question {
+  id             String   @id @default(uuid())
+  testId         String
+  test           Test     @relation(fields: [testId], references: [id])
+  skillName      String   // The specific skill being tested
+  type           QType
+  prompt         String   @db.Text
+  options        Json?    // For multiple choice (A, B, C, D)
+  expectedAnswer String?  @db.Text // Exact answer or LLM grading rubric
+  userAnswer     String?  @db.Text // Code or text submitted by candidate
+  score          Float?   // Score out of 100 for this specific question
+  feedback       String?  @db.Text // LLM-generated explanation of the score
+}
+
+enum QType {
+  CODING
+  MULTIPLE_CHOICE
+  SHORT_ANSWER
+}
