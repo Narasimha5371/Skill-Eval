@@ -3,32 +3,49 @@
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Editor from "@monaco-editor/react";
-import { Timer, Send, ChevronRight, ChevronLeft, Loader2 } from "lucide-react";
+import { Timer, Send, ChevronRight, ChevronLeft, Loader2, FileText } from "lucide-react";
+
+interface Question {
+  id: string;
+  prompt: string;
+  type: "CODING" | "MULTIPLE_CHOICE" | "SHORT_ANSWER";
+  options?: string[];
+  skillName: string;
+}
+
+interface Test {
+  id: string;
+  questions: Question[];
+}
 
 export default function AssessmentExecution() {
   const params = useParams();
+  const testId = params.testId as string;
   const router = useRouter();
-  const [test, setTest] = useState<any>(null);
+  const [test, setTest] = useState<Test | null>(null);
   const [currentIdx, setCurrentIdx] = useState(0);
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
+    if (!testId) return;
     async function fetchTest() {
-      const res = await fetch(`/api/tests/${params.testId}`);
+      const res = await fetch(`/api/tests/${testId}`);
       const data = await res.json();
       setTest(data.test);
       setLoading(false);
     }
     fetchTest();
-  }, [params.testId]);
+  }, [testId]);
 
   const handleAnswerChange = (val: string) => {
+    if (!test) return;
     setAnswers({ ...answers, [test.questions[currentIdx].id]: val });
   };
 
   const handleNext = () => {
+    if (!test) return;
     if (currentIdx < test.questions.length - 1) {
       setCurrentIdx(currentIdx + 1);
     }
@@ -41,10 +58,12 @@ export default function AssessmentExecution() {
   };
 
   const handleSubmit = async () => {
+    if (!test) return;
     setSubmitting(true);
     try {
       await fetch(`/api/tests/${params.testId}/submit`, {
         method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ answers }),
       });
       router.push("/candidate/completed");
@@ -55,7 +74,7 @@ export default function AssessmentExecution() {
     }
   };
 
-  if (loading) return <div className="flex items-center justify-center min-h-screen"><Loader2 className="animate-spin w-12 h-12 text-blue-600" /></div>;
+  if (loading || !test) return <div className="flex items-center justify-center min-h-screen"><Loader2 className="animate-spin w-12 h-12 text-blue-600" /></div>;
 
   const currentQuestion = test.questions[currentIdx];
 
@@ -93,7 +112,7 @@ export default function AssessmentExecution() {
             <span className="text-xs font-bold text-blue-500 uppercase tracking-widest">{currentQuestion.skillName}</span>
             <h2 className="text-2xl font-bold mt-2 mb-6 leading-tight">{currentQuestion.prompt}</h2>
 
-            {currentQuestion.type === "MULTIPLE_CHOICE" && (
+            {currentQuestion.type === "MULTIPLE_CHOICE" && currentQuestion.options && (
               <div className="space-y-3">
                 {currentQuestion.options.map((opt: string, idx: number) => (
                   <button
@@ -174,22 +193,4 @@ export default function AssessmentExecution() {
   );
 }
 
-function FileText({ className }: { className?: string }) {
-  return (
-    <svg 
-      className={className} 
-      viewBox="0 0 24 24" 
-      fill="none" 
-      stroke="currentColor" 
-      strokeWidth="2" 
-      strokeLinecap="round" 
-      strokeLinejoin="round"
-    >
-      <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" />
-      <polyline points="14 2 14 8 20 8" />
-      <line x1="16" y1="13" x2="8" y2="13" />
-      <line x1="16" y1="17" x2="8" y2="17" />
-      <line x1="10" y1="9" x2="8" y2="9" />
-    </svg>
-  );
-}
+
